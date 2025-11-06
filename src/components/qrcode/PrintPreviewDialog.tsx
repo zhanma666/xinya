@@ -86,7 +86,7 @@ export function PrintPreviewDialog({
 
                     <div className="flex">
                       <span className="font-medium w-24">料品名称:</span>
-                      <span className="text-muted-foreground">{material.item_name || "-"}</span>
+                      <span className="text-muted-foreground">石英砂</span>
                     </div>
 
                     <div className="flex">
