@@ -104,13 +104,13 @@ export function PrinterConfigDialog({
       setTestResult(result);
 
       if (result) {
-        toast.success("打印机连接成功！");
+        toast.success("配置信息已验证，格式正确");
       } else {
-        toast.error("打印机连接失败，请检查IP地址和网络连接");
+        toast.error("配置信息不完整，请检查");
       }
     } catch (error) {
       setTestResult(false);
-      toast.error("打印机连接测试失败");
+      toast.error("配置验证失败");
     } finally {
       setTesting(false);
     }

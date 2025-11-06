@@ -37,69 +37,60 @@ export function generateZPL(material: Material): string {
   return zpl.trim();
 }
 
-// 发送打印任务到打印机
+// 下载ZPL文件
+export function downloadZPL(zplData: string, filename: string) {
+  const blob = new Blob([zplData], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+// 发送打印任务到打印机（注意：Web浏览器无法直接连接打印机）
 export async function sendPrintJob(
   zplData: string,
   printerConfig: PrinterConfig
 ): Promise<boolean> {
   try {
+    // 尝试通过HTTP发送（仅在特殊网络环境下可用）
     const response = await fetch(`http://${printerConfig.printer_ip}:${printerConfig.printer_port}`, {
       method: "POST",
+      mode: "no-cors",
       headers: {
         "Content-Type": "text/plain",
       },
       body: zplData,
     });
 
-    return response.ok;
-  } catch (error) {
-    console.error("打印失败:", error);
-    throw new Error("无法连接到打印机，请检查打印机IP地址和网络连接");
-  }
-}
-
-// 批量打印
-export async function batchPrint(
-  materials: Material[],
-  printerConfig: PrinterConfig,
-  onProgress?: (current: number, total: number) => void
-): Promise<{ success: number; failed: number }> {
-  let success = 0;
-  let failed = 0;
-
-  for (let i = 0; i < materials.length; i++) {
-    try {
-      const zpl = generateZPL(materials[i]);
-      await sendPrintJob(zpl, printerConfig);
-      success++;
-    } catch (error) {
-      console.error(`打印第 ${i + 1} 个标签失败:`, error);
-      failed++;
-    }
-
-    if (onProgress) {
-      onProgress(i + 1, materials.length);
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-
-  return { success, failed };
-}
-
-// 测试打印机连接
-export async function testPrinterConnection(printerConfig: PrinterConfig): Promise<boolean> {
-  const testZPL = `
-^XA
-^FO50,50^CF0,40^FD打印机连接测试^FS
-^FO50,100^CF0,30^FD测试时间: ${new Date().toLocaleString("zh-CN")}^FS
-^XZ
-`;
-
-  try {
-    await sendPrintJob(testZPL, printerConfig);
     return true;
   } catch (error) {
-    return false;
+    console.error("直接打印失败:", error);
+    throw new Error("浏览器安全限制无法直接连接打印机");
   }
+}
+
+// 批量生成ZPL并下载
+export function batchDownloadZPL(materials: Material[]): string {
+  let allZPL = "";
+  
+  for (const material of materials) {
+    allZPL += generateZPL(material) + "\n\n";
+  }
+  
+  return allZPL;
+}
+
+// 测试打印机连接（Web环境下无法真正测试）
+export async function testPrinterConnection(printerConfig: PrinterConfig): Promise<boolean> {
+  // Web浏览器无法直接测试打印机连接
+  // 返回配置是否完整
+  return !!(
+    printerConfig.printer_ip &&
+    printerConfig.printer_port &&
+    printerConfig.printer_name
+  );
 }
