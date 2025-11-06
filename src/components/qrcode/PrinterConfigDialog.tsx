@@ -1,0 +1,275 @@
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { Loader2, Printer, CheckCircle2, XCircle } from "lucide-react";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { printerConfigApi } from "@/db/api";
+import { testPrinterConnection } from "@/utils/print";
+import type { PrinterConfig } from "@/types/types";
+
+const formSchema = z.object({
+  printer_name: z.string().min(1, "请输入打印机名称"),
+  printer_type: z.string().min(1, "请输入打印机类型"),
+  printer_ip: z.string().regex(/^(\d{1,3}\.){3}\d{1,3}$/, "请输入有效的IP地址"),
+  printer_port: z.number().min(1).max(65535, "端口号范围：1-65535"),
+});
+
+type FormValues = z.infer<typeof formSchema>;
+
+interface PrinterConfigDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfigUpdated: () => void;
+}
+
+export function PrinterConfigDialog({
+  open,
+  onOpenChange,
+  onConfigUpdated,
+}: PrinterConfigDialogProps) {
+  const [loading, setLoading] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<boolean | null>(null);
+  const [currentConfig, setCurrentConfig] = useState<PrinterConfig | null>(null);
+
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      printer_name: "ZDesigner ZD888-203dpi ZPL",
+      printer_type: "斑马打印机",
+      printer_ip: "172.16.5.199",
+      printer_port: 9100,
+    },
+  });
+
+  useEffect(() => {
+    if (open) {
+      loadConfig();
+    }
+  }, [open]);
+
+  const loadConfig = async () => {
+    try {
+      const config = await printerConfigApi.getDefault();
+      if (config) {
+        setCurrentConfig(config);
+        form.reset({
+          printer_name: config.printer_name,
+          printer_type: config.printer_type,
+          printer_ip: config.printer_ip,
+          printer_port: config.printer_port,
+        });
+      }
+    } catch (error) {
+      console.error("加载打印机配置失败:", error);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    const values = form.getValues();
+    setTesting(true);
+    setTestResult(null);
+
+    try {
+      const tempConfig: PrinterConfig = {
+        id: "",
+        printer_name: values.printer_name,
+        printer_type: values.printer_type,
+        printer_ip: values.printer_ip,
+        printer_port: values.printer_port,
+        is_default: true,
+        created_at: "",
+        updated_at: "",
+      };
+
+      const result = await testPrinterConnection(tempConfig);
+      setTestResult(result);
+
+      if (result) {
+        toast.success("打印机连接成功！");
+      } else {
+        toast.error("打印机连接失败，请检查IP地址和网络连接");
+      }
+    } catch (error) {
+      setTestResult(false);
+      toast.error("打印机连接测试失败");
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const onSubmit = async (values: FormValues) => {
+    setLoading(true);
+    try {
+      if (currentConfig) {
+        await printerConfigApi.update(currentConfig.id, values);
+        toast.success("打印机配置已更新");
+      } else {
+        const newConfig: Omit<PrinterConfig, "id" | "created_at" | "updated_at"> = {
+          printer_name: values.printer_name,
+          printer_type: values.printer_type,
+          printer_ip: values.printer_ip,
+          printer_port: values.printer_port,
+          is_default: true,
+        };
+        await printerConfigApi.create(newConfig);
+        toast.success("打印机配置已保存");
+      }
+
+      onConfigUpdated();
+      onOpenChange(false);
+    } catch (error) {
+      console.error("保存打印机配置失败:", error);
+      toast.error("保存失败，请重试");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Printer className="h-5 w-5" />
+            打印机配置
+          </DialogTitle>
+          <DialogDescription>配置斑马打印机连接参数</DialogDescription>
+        </DialogHeader>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="printer_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>打印机名称</FormLabel>
+                  <FormControl>
+                    <Input placeholder="请输入打印机名称" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="printer_type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>打印机类型</FormLabel>
+                  <FormControl>
+                    <Input placeholder="请输入打印机类型" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="printer_ip"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>打印机IP地址</FormLabel>
+                  <FormControl>
+                    <Input placeholder="例如：172.16.5.199" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="printer_port"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>打印机端口</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      placeholder="默认：9100"
+                      {...field}
+                      onChange={(e) => field.onChange(Number(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleTestConnection}
+                disabled={testing}
+                className="flex-1"
+              >
+                {testing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    测试中...
+                  </>
+                ) : (
+                  "测试连接"
+                )}
+              </Button>
+
+              {testResult !== null && (
+                <div className="flex items-center gap-1">
+                  {testResult ? (
+                    <CheckCircle2 className="h-5 w-5 text-success" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-destructive" />
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={loading}
+              >
+                取消
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    保存中...
+                  </>
+                ) : (
+                  "保存配置"
+                )}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}

@@ -1,4 +1,4 @@
-import SamplePage from './pages/SamplePage';
+import QRCodePrintTool from './pages/QRCodePrintTool';
 import type { ReactNode } from 'react';
 
 interface RouteConfig {
@@ -10,9 +10,9 @@ interface RouteConfig {
 
 const routes: RouteConfig[] = [
   {
-    name: 'Sample Page',
+    name: '二维码生成打印工具',
     path: '/',
-    element: <SamplePage />
+    element: <QRCodePrintTool />
   }
 ];
 
