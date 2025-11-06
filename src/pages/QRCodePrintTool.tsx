@@ -43,7 +43,7 @@ import { MaterialEditDialog } from "@/components/qrcode/MaterialEditDialog";
 import { PrintInstructionsDialog } from "@/components/qrcode/PrintInstructionsDialog";
 import { materialsApi, printerConfigApi } from "@/db/api";
 import { exportMaterialsToExcel } from "@/utils/excel";
-import { generateZPL, sendPrintJob, batchDownloadZPL, downloadZPL } from "@/utils/print";
+import { generateZPL, batchDownloadZPL, downloadZPL } from "@/utils/print";
 import type { Material, PrinterConfig } from "@/types/types";
 
 export default function QRCodePrintTool() {
@@ -168,12 +168,13 @@ export default function QRCodePrintTool() {
 
     try {
       const zpl = generateZPL(currentMaterial);
-      await sendPrintJob(zpl, printerConfig);
-      toast.success("打印任务已发送");
+      const filename = `label_${currentMaterial.bucket_code || "unknown"}_${Date.now()}.zpl`;
+      downloadZPL(zpl, filename);
+      toast.success("ZPL 文件已下载，请使用打印工具发送到打印机");
       setShowPrintPreview(false);
     } catch (error) {
-      console.error("打印失败:", error);
-      toast.error("无法直接打印，请使用下载ZPL方式");
+      console.error("生成ZPL失败:", error);
+      toast.error("生成ZPL文件失败");
     }
   };
 

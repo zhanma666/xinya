@@ -54,29 +54,6 @@ export function downloadZPL(zplData: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-// 发送打印任务到打印机（注意：Web浏览器无法直接连接打印机）
-export async function sendPrintJob(
-  zplData: string,
-  printerConfig: PrinterConfig
-): Promise<boolean> {
-  try {
-    // 尝试通过HTTP发送（仅在特殊网络环境下可用）
-    const response = await fetch(`http://${printerConfig.printer_ip}:${printerConfig.printer_port}`, {
-      method: "POST",
-      mode: "no-cors",
-      headers: {
-        "Content-Type": "text/plain",
-      },
-      body: zplData,
-    });
-
-    return true;
-  } catch (error) {
-    console.error("直接打印失败:", error);
-    throw new Error("浏览器安全限制无法直接连接打印机");
-  }
-}
-
 // 批量生成ZPL并下载
 export function batchDownloadZPL(materials: Material[]): string {
   let allZPL = "";
@@ -88,13 +65,39 @@ export function batchDownloadZPL(materials: Material[]): string {
   return allZPL;
 }
 
-// 测试打印机连接（Web环境下无法真正测试）
-export async function testPrinterConnection(printerConfig: PrinterConfig): Promise<boolean> {
-  // Web浏览器无法直接测试打印机连接
-  // 返回配置是否完整
+// 验证打印机配置是否完整
+export function validatePrinterConfig(printerConfig: PrinterConfig): boolean {
   return !!(
     printerConfig.printer_ip &&
     printerConfig.printer_port &&
     printerConfig.printer_name
   );
+}
+
+// 生成打印说明文本
+export function getPrintInstructions(printerConfig: PrinterConfig): string {
+  return `
+打印机配置信息：
+- 打印机名称：${printerConfig.printer_name}
+- 打印机类型：${printerConfig.printer_type}
+- IP地址：${printerConfig.printer_ip}
+- 端口：${printerConfig.printer_port}
+
+由于浏览器安全限制（HTTPS 无法访问 HTTP 资源），请使用以下方法之一打印：
+
+方法一：使用 Zebra Setup Utilities
+1. 下载并安装 Zebra Setup Utilities
+2. 打开软件，选择打印机
+3. 点击 "Send File" 发送下载的 ZPL 文件
+
+方法二：使用命令行（Windows）
+copy /b 文件名.zpl \\\\${printerConfig.printer_ip}\\共享名
+
+方法三：使用命令行（Linux/Mac）
+cat 文件名.zpl | nc ${printerConfig.printer_ip} ${printerConfig.printer_port}
+
+方法四：使用 Zebra Browser Print
+1. 下载并安装 Zebra Browser Print 客户端
+2. 运行服务后即可直接打印
+  `.trim();
 }

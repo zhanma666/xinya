@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, Printer, CheckCircle2, XCircle } from "lucide-react";
+import { Printer, Info } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Form,
   FormControl,
@@ -22,7 +23,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { printerConfigApi } from "@/db/api";
-import { testPrinterConnection } from "@/utils/print";
+import { validatePrinterConfig } from "@/utils/print";
 import type { PrinterConfig } from "@/types/types";
 
 const formSchema = z.object({
@@ -46,8 +47,6 @@ export function PrinterConfigDialog({
   onConfigUpdated,
 }: PrinterConfigDialogProps) {
   const [loading, setLoading] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<boolean | null>(null);
   const [currentConfig, setCurrentConfig] = useState<PrinterConfig | null>(null);
 
   const form = useForm<FormValues>({
@@ -80,39 +79,6 @@ export function PrinterConfigDialog({
       }
     } catch (error) {
       console.error("加载打印机配置失败:", error);
-    }
-  };
-
-  const handleTestConnection = async () => {
-    const values = form.getValues();
-    setTesting(true);
-    setTestResult(null);
-
-    try {
-      const tempConfig: PrinterConfig = {
-        id: "",
-        printer_name: values.printer_name,
-        printer_type: values.printer_type,
-        printer_ip: values.printer_ip,
-        printer_port: values.printer_port,
-        is_default: true,
-        created_at: "",
-        updated_at: "",
-      };
-
-      const result = await testPrinterConnection(tempConfig);
-      setTestResult(result);
-
-      if (result) {
-        toast.success("配置信息已验证，格式正确");
-      } else {
-        toast.error("配置信息不完整，请检查");
-      }
-    } catch (error) {
-      setTestResult(false);
-      toast.error("配置验证失败");
-    } finally {
-      setTesting(false);
     }
   };
 
@@ -218,34 +184,13 @@ export function PrinterConfigDialog({
               )}
             />
 
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleTestConnection}
-                disabled={testing}
-                className="flex-1"
-              >
-                {testing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    测试中...
-                  </>
-                ) : (
-                  "测试连接"
-                )}
-              </Button>
-
-              {testResult !== null && (
-                <div className="flex items-center gap-1">
-                  {testResult ? (
-                    <CheckCircle2 className="h-5 w-5 text-success" />
-                  ) : (
-                    <XCircle className="h-5 w-5 text-destructive" />
-                  )}
-                </div>
-              )}
-            </div>
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                由于浏览器安全限制（HTTPS 无法访问 HTTP 资源），Web 应用无法直接连接打印机。
+                请使用"下载ZPL"功能，然后通过 Zebra Setup Utilities 或命令行工具发送到打印机。
+              </AlertDescription>
+            </Alert>
 
             <div className="flex justify-end gap-2 pt-4">
               <Button
@@ -257,14 +202,7 @@ export function PrinterConfigDialog({
                 取消
               </Button>
               <Button type="submit" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    保存中...
-                  </>
-                ) : (
-                  "保存配置"
-                )}
+                保存配置
               </Button>
             </div>
           </form>
