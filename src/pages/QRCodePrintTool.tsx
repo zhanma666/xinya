@@ -43,7 +43,14 @@ import { MaterialEditDialog } from "@/components/qrcode/MaterialEditDialog";
 import { PrintInstructionsDialog } from "@/components/qrcode/PrintInstructionsDialog";
 import { materialsApi, printerConfigApi } from "@/db/api";
 import { exportMaterialsToExcel } from "@/utils/excel";
-import { generateZPL, batchDownloadZPL, downloadZPL } from "@/utils/print";
+import { 
+  generateZPL, 
+  batchDownloadZPL, 
+  downloadZPL, 
+  sendToNetworkPrinter, 
+  batchSendToPrinter, 
+  testPrinterConnection
+} from "@/utils/print";
 import type { Material, PrinterConfig } from "@/types/types";
 
 export default function QRCodePrintTool() {
@@ -168,13 +175,12 @@ export default function QRCodePrintTool() {
 
     try {
       const zpl = generateZPL(currentMaterial);
-      const filename = `label_${currentMaterial.bucket_code || "unknown"}_${Date.now()}.zpl`;
-      downloadZPL(zpl, filename);
-      toast.success("ZPL 文件已下载，请使用打印工具发送到打印机");
+      await sendToNetworkPrinter(zpl, printerConfig);
+      toast.success("标签已发送到打印机");
       setShowPrintPreview(false);
     } catch (error) {
-      console.error("生成ZPL失败:", error);
-      toast.error("生成ZPL文件失败");
+      console.error("打印失败:", error);
+      toast.error(error.message || "打印失败，请检查打印机连接");
     }
   };
 
@@ -185,10 +191,35 @@ export default function QRCodePrintTool() {
     }
 
     const selectedMaterials = materials.filter((m) => selectedIds.includes(m.id));
-    const allZPL = batchDownloadZPL(selectedMaterials);
-    const filename = `批量标签_${Date.now()}.zpl`;
-    downloadZPL(allZPL, filename);
-    toast.success(`已生成 ${selectedMaterials.length} 个标签的ZPL文件`);
+    
+    if (printerConfig) {
+      try {
+        await batchSendToPrinter(selectedMaterials, printerConfig);
+        toast.success(`成功发送 ${selectedMaterials.length} 个标签到打印机`);
+      } catch (error) {
+        console.error("批量打印失败:", error);
+        toast.error(error.message || "批量打印失败");
+      }
+    } else {
+      toast.error("请先配置打印机");
+    }
+  };
+
+  const handleTestPrinterConnection = async () => {
+    if (!printerConfig) {
+      toast.error("请先配置打印机");
+      return;
+    }
+
+    toast.loading("正在测试打印机连接...");
+    
+    const isConnected = await testPrinterConnection(printerConfig);
+    
+    if (isConnected) {
+      toast.success("打印机连接正常");
+    } else {
+      toast.error("打印机连接失败，请检查网络和配置");
+    }
   };
 
   const handleToggleBatchLock = async (material: Material) => {
@@ -292,6 +323,15 @@ export default function QRCodePrintTool() {
             <Button onClick={handleBatchPrint} disabled={selectedIds.length === 0}>
               <FileDown className="mr-2 h-4 w-4" />
               批量下载ZPL
+            </Button>
+
+            <Button 
+              variant="outline" 
+              onClick={handleTestPrinterConnection}
+              disabled={!printerConfig}
+            >
+              <Printer className="mr-2 h-4 w-4" />
+              测试打印机连接
             </Button>
 
             <Button variant="outline" onClick={() => setShowExcelImport(true)}>
